@@ -1,0 +1,8 @@
+---
+- name: Redémarrage des hôtes Windows Server
+  hosts: windows_server
+  gather_facts: true
+  tasks:
+    - name: Redémarrage de l'hôte dans 5min
+      ansible.windows.win_reboot:
+        reboot_timeout: 3600

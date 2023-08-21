@@ -1,0 +1,31 @@
+all:
+  children:
+    debian:
+      hosts:
+        192.168.x.x: {}
+        192.168.x.x: {}
+        192.168.x.x: {}
+        192.168.x.x: {}
+    guacamole_prod:
+      hosts:
+        192.168.x.x: {}
+    guacamole_dev:
+      hosts:
+        192.168.x.x: {}
+    redhat:
+      hosts:
+        192.168.x.x: {}
+    windows_server:
+      hosts:
+        srv-dc1.domain.local: {}
+        srv-dc2.domain.local: {}
+      vars:
+        ansible_user: ansible
+        ansible_password:
+        ansible_connection: winrm
+        ansible_shell_type: cmd
+        ansible_winrm_transport: basic
+        ansible_port: 5986
+        ansible_winrm_scheme: https
+        ansible_winrm_server_cert_validation: ignore
+        ansible_winrm_kerberos_delegation: true

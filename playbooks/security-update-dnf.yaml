@@ -1,0 +1,59 @@
+---
+- hosts: redhat
+  gather_facts: True
+  vars:
+     min_required_boot_space: 50
+  tasks:
+      - name: "[ Boot Disk Task ] - Libérer de l'espace en désinstallant les kernels non utilisés"
+        shell: "{% if ansible_distribution_major_version|int == 7 %}{{ rhel7syntax }}{% elif ansible_distribution_major_version|int == 8 %}{{ rhel8syntax }}{% endif %}"
+        failed_when: false
+        vars:
+          rhel7syntax: '/usr/bin/package-cleanup --oldkernels --count=1 -y'
+          rhel8syntax: '/usr/bin/dnf remove --oldinstallonly -y'
+        args:
+          warn: no
+
+      - name: "[ Boot Disk Task ] - Checking des facts après le nettoyage de /boot"
+        setup:
+          gather_subset: hardware
+
+      - name: "[ Boot Disk Task ] - Set facts"
+        set_fact:
+          __bootvol_size: "{{ ((ansible_facts['mounts']|selectattr('mount','equalto','/boot')|map(attribute='size_available')|list)[0]|filesizeformat(True)).split()[0] }}"
+          __bootvol_units: "{{ ((ansible_facts['mounts']|selectattr('mount','equalto','/boot')|map(attribute='size_available')|list)[0]|filesizeformat(True)).split()[1] }}"
+
+      - name: "[ Boot Disk Task ] - Check si /boot a assez d'espace libre"
+        assert:
+          that:
+            - ansible_facts is defined
+            - ("'mi' in __bootvol_units|lower" and min_required_boot_space|int > __bootvol_size|float ) or ("'gi' in __bootvol_units|lower" and __bootvol_size|int >= 1)
+          fail_msg: "/boot n'a pas assez de place. Libérez de l'espace de façon manuelle et relancer la task"
+          success_msg: "/boot a assez de place."
+
+      - name: "Installation des updates de sécurité en utilisant DNF"
+        dnf:
+          name: "*"
+          security: yes
+          bugfix: yes
+          state: latest
+          update_cache: yes
+          update_only: yes
+        register: dnf_update_status
+
+      - name: "Nettoyage des paquets non nécessaire"
+        dnf:
+          autoremove: yes
+
+      - name: Vérification si un reboot est nécessaire
+        register: reboot_required_file
+        stat: path=/var/run/reboot-required get_md5=no
+
+      - name: Reboot the box if kernel updated
+        reboot:
+          msg: "Redémarrage suite à une mise à jour du kernel"
+          connect_timeout: 5
+          reboot_timeout: 300
+          pre_reboot_delay: 0
+          post_reboot_delay: 30
+          test_command: uptime
+        when: reboot_required_file.stat.exists
